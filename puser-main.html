@@ -1,0 +1,368 @@
+<!-- View Root -->
+<div class="puser-root">
+    <div class="puser-container m-scene clearfix" v-if="!showLembarNilai">
+
+        <template v-if="showSessionList || showSessionDetail || !showNilaiList || !showLembarNilai">
+            <div class="puser-header">
+                <img class="puser-logo img img-responsive" :src="logo">
+                <h3 class="apptitle">PENILAIAN</h3>
+                <h2 class="scenarioname">{{scenarioName}}</h2>
+                <!-- <p class="penilainame">
+                        PENILAI: {{penilai.user.rank}} {{penilai.user.name}}
+                        [{{penilai.role.position}}]
+                    </p> -->
+                <p v-if="loading">
+                    <fa class="fa fa-fw fa-spin fa-circle-o-notch"></fa>
+                    Loading...
+                </p>
+            </div>
+        </template>
+
+        <template v-if="showSessionList">
+            <div class="puser-aside page-layout scene_element scene_element--fadein">
+                <div class="header">
+                    <h2>{{activeTab}}</h2>
+                    <a href="#"
+                       class="btn btn-default"
+                       :class="{'btn-warning': needRefreshData, 'disabled': refreshing}"
+                       @click.prevent="refresh">
+                        <fa class="fa fa-fw fa-refresh"
+                            :class="{'fa-spin': refreshing}"></fa>
+                        Perbaharui Data
+                    </a>                
+                    <!-- todo: print -->
+                    <!--<a href="#" class="btn btn-default">-->
+                        <!--<fa class="fa fa-fw fa-print"></fa>-->
+                        <!--Print-->
+                    <!--</a>-->
+                    <a href="#"
+                       class="btn btn-default"
+                       @click.prevent="handleOpenBook"
+                       :disabled="openBook">
+                       <fa class="fa fa-fw fa-book"></fa>
+                       Dokumen Referensi
+                    </a>
+                    <a href="#"
+                       @click.prevent="ExportToCsv"
+                       class="btn btn-default">
+                        <fa class="fa fa-fw fa-print"></fa>
+                        Ekspor ke CSV
+                    </a>
+                </div>
+                <div class="content">
+                    <ul class="nav nav-tabs">
+                        <li role="presentation"
+                            v-for="(category, index) in checklistCat"
+                            @click.prevent="selectTab(category)"
+                            :class="{active: category === activeTab}">
+                            <template v-if="category !== 'Tidak Digunakan'">
+                                <a href="#">{{category}}</a>
+                            </template>
+                        </li>
+                        <li :class="{active: activeTab === 'Nilai Perorangan'}">
+                            <a href="#"
+                               @click.prevent="selectTab('Nilai Perorangan')"
+                            >Nilai Perorangan</a>
+                        </li>
+                    </ul>
+                    <div class="content-table">
+                        <!-- Nilai Produk / Nilai Posko -->
+                        <produk v-show="activeTab === 'Semua Posko'"
+                                      :role-groups="filteredRoleGroups"
+                                      :posko-checklists="poskoChecklists"
+                                      :mapped-group="mappedGroup"
+                                      :nilai-data="nilaiData"
+                        ></produk>
+
+                        <!-- Nilai Aktivitas -->
+                        <aktivitas-pelaku v-show="activeTab === 'Aktivitas Pelaku'"></aktivitas-pelaku>
+
+                        <!--Nilai Perorangan -->
+                        <nilai-perorangan v-show="activeTab === 'Nilai Perorangan'"></nilai-perorangan>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+    </div>
+
+    <lembar-isian v-if="showLembarNilai"
+                  :scenario-name="scenarioName"
+                  :checklist="selectedChecklist"
+                  :subyek="subyek"
+                  :role-groups-obj="roleGroupsObj"
+                  :category="category"
+                  :penilai="penilai"
+                  @close="closeLembarNilai"
+    ></lembar-isian>
+</div>
+
+
+<!-- Nilai Produk -->
+<template class="nilai-produk-template">
+    jumlah nilaiData {{nilaiData.length}}
+    <table class="table table-responsive table-hover table-bordered">
+        <thead>
+        <tr>
+            <th>No.<input type="hidden" v-model="roleGroups" id="sp_role_groups">
+            <input type="hidden" v-model="poskoChecklists" id="sp_posko_check_lists">
+            <input type="hidden" v-model="mappedGroup" id="sp_mapped_group">
+            <input type="hidden" v-model="nilaiData" id="sp_nilai_data">
+
+            </th>
+
+            <th class="text-center">Aspek Penilaian</th>
+            <!-- roleGroups -->
+            <th class="text-center" v-for="roleGroup in roleGroups">{{roleGroup.name}}</th>
+        </tr>
+        </thead>
+        <tbody>
+        <template v-for="(checklist, index) in poskoChecklists">
+            <checklist-row :checklist="checklist"
+                           :index="index"
+                           :role-groups="roleGroups"
+                           :nilai-data="nilaiData"
+                           
+            ></checklist-row>
+        </template>
+        <!-- summary -->
+        <tr>
+            <td class="info text-center">#</td>
+            <td class="info text-center">
+                REKAPITULASI NILAI AKHIR <br>
+                <!-- <span class="label label-success">BP-23/OYU I/17 NAP</span> -->
+            </td>
+            <!-- Total Nilai Array -->
+            <template v-for="group in mappedGroup">
+                <total-nilai :group="group"></total-nilai>
+            </template>
+        </tr>
+        <tr>
+            <td class="info text-center">#</td>
+            <td class="info text-center"></td>
+            <template v-for="group in roleGroups">
+                <td class="text-center info">{{group.name}}</td>
+            </template>
+        </tr>
+        </tbody>
+    </table>
+</template>
+
+<template class="checklist-row-template">
+    <tr>
+        <td>{{index + 1}}</td>
+        <td>{{checklist.aspect}}<br>
+            <div class="label label-success">{{checklist.code}}</div>
+        </td>
+        <td v-for="roleGroup in roleGroups">
+            <!--<nilai :nilai="filterNilaiData(roleGroup, nilaiData)"-->
+                   <!--:role-group="roleGroup"-->
+                   <!--:checklist="checklist"-->
+            <!--&gt;</nilai>-->
+            <nilai :nilai-data="nilaiData"
+                   :role-group="roleGroup"
+                   :checklist="checklist"
+            ></nilai>
+        </td>
+    </tr>
+</template>
+
+<template class="navigation-template">
+    <div class="breadcrumbs">
+        <h4><a @click.prevent="closeNilaiList">{{subyek.name}}</a> / {{checkListUserBreadCrumbs}} /
+            <a @click.prevent="closeLembarNilai">Daftar Nilai</a> / {{selectedChecklist.aspect}}</h4>
+        <a class="closebutton right" @click.prevent="closeLembarNilai">
+            <fa class="fa fa-fw fa-close"></fa>
+            Tutup
+        </a>
+    </div>
+</template>
+
+<template class="lembar-isian-template">
+    <div class="puser-container fx-row m-scene clearfix">
+        <div class="puser-aside big page-layout clearfix">
+            <div class="label label-success">{{scenarioName}}</div>
+            <div class="label label-info">{{category}}</div>
+            <h3>{{roleGroup.name}}</h3>
+            <h2>{{checklist.aspect}}</h2>
+            <p>{{checklist.code}}</p>
+            <p>Masukkan penilaian dan apabila sudah selesai tekan tombol simpan</p>
+            <hr>
+            <a @click.prevent="close" class="btn btn-default">
+                <fa class="fa fa-fw fa-close"></fa>
+                Tutup
+            </a>
+        </div>
+        <div class="puser-main page-layout pu-scroll-y clearfix">
+            <a class="closebutton right" @click.prevent="close">
+                <fa class="fa fa-fw fa-close"></fa>
+                Tutup
+            </a>
+            <!-- lembar isian here -->
+            <div class="puser-lembar-nilai paperlike"></div>
+        </div>
+    </div>
+</template>
+
+<template class="nilai-template">
+    <div class="hasil-nilai">
+        <a class='btn btn-default btn-group-justified angka'
+           :class="nilaiKualitatif"
+           v-if="nilai"
+           @click.prevent="select(checklist, {ref: roleGroup, type: 'roleGroup'}, checklist.description)"
+        ><h3>{{hasil}}</h3></a>
+        <div class='angka' v-else><h3></h3></div>
+        <!-- <div class="text-center">{{roleGroup.name}}</div> -->
+        <template v-if="checklist.penilaian">
+            <template v-if="!nilai">
+                <a @click.prevent="select(checklist, {ref: roleGroup, type: 'roleGroup'}, checklist.description)"
+                   :class="{'btn-warning': nilai}"
+                   href="#"
+                   class="btn btn-default btn-group-justified aksi"
+                >
+                    <template v-if="nilai">detail</template>
+                    <template v-else>penilaian</template>
+                </a>
+            </template>
+        </template>
+        <template v-else>
+            <div class="aksi">
+                <fa class="fa fa-fw fa-minus"></fa>
+            </div>
+        </template>
+    </div>
+</template>
+
+<template class="total-nilai-template">
+    <td class="info hasil-akhir-kogas">
+        <strong><h2 class="text-center">{{hasil | toFixed}}</h2></strong>
+    </td>
+</template>
+
+
+<!-- Aktivitas Pelaku -->
+<template class="aktivitas-pelaku-template">
+    <div class="hasil-akhir-aktivitas">
+        <!-- <a href="#" @click="addDay" class="btn btn-primary">
+            <fa class="fa fa-fw fa-plus"></fa>
+            Tambahkan Hari
+        </a> -->
+        <br>
+        <div v-for="group in groupedPelaku" v-if="group.name !== 'DEV' && group.countPelaku() !== 0">
+            <h3>{{group.name}} ({{group.countPelaku() + ' Pelaku'}})</h3>
+            <table class="table table-bordered">
+                <col width="50">
+                <col width="200">
+                <col width="100">
+                <col width="200">
+
+                <col v-for="day in trainingDays" width="50">
+
+                <col width="75">
+                <thead>
+                <tr>
+                    <th rowspan="2" class="text-center info valign-middle">NO</th>
+                    <th rowspan="2" class="text-center info valign-middle">NAMA</th>
+                    <th rowspan="2" class="text-center info valign-middle">PANGKAT/KORP</th>
+                    <th rowspan="2" class="text-center info valign-middle">JABATAN DALAM LATIHAN</th>
+                    <th :colspan="trainingDays" class="text-center info valign-middle">NILAI AKTIVITAS</th>
+                    <th rowspan="2" class="text-center info valign-middle">RATA-RATA</th>
+                </tr>
+                <tr>
+                    <th v-for="day in trainingDays"
+                        class="text-center info valign-middle"
+                        :class="determineSelectedDay(group, day)"
+                    >{{'H' + day}}
+                    </th>
+                </tr>
+                <tr>
+                    <th class="text-center info" v-for="n in 4">{{n}}</th>
+                    <th class="text-center info"
+                        v-for="d in trainingDays"
+                        :class="determineSelectedDay(group, d)"
+                    >{{d + 4}}
+                    </th>
+                    <th class="text-center info">{{1 + 4 + trainingDays}}</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr v-for="pelaku, key in group.paraPelaku">
+                    <td></td>
+                    <td>{{pelaku.user.name}}</td>
+                    <td>{{pelaku.user.rank}}</td>
+                    <td>{{pelaku.role.position}} / {{pelaku.role.positionCode}}</td>
+
+                    <template v-for="day in trainingDays">
+                        <td class="text-center day-column"
+                            :class="determineSelectedDay(group, day)"
+                            @click="openDetail(group, day)"
+                            @mouseover="handleDayHover(group, day)"
+                        >{{pelaku.nilaiAktivitas.day[day].average | toFixed}}
+                        </td>
+                    </template>
+
+                    <td class="text-center">{{pelaku.nilaiAktivitas.getAverage() | toFixed}}</td>
+                </tr>
+                </tbody>
+            </table>
+            <br>
+        </div>
+        <!-- todo: ini harus ada walalupun display none -->
+        <ul style="display: none;">
+            <li v-for="pelaku in paraPelaku">{{pelaku.user.name}}</li>
+        </ul>
+    </div>
+</template>
+
+
+<!-- Nilai Perorangan -->
+<template class="nilai-perorangan-template">
+    <div class="hasil-akhir-perorangan">
+        <table class="table table-hover table-bordered">
+            <col width="50">
+            <col width="200">
+            <col width="200">
+            <col width="200">
+            <col width="75">
+            <col width="75">
+            <col width="75">
+            <thead>
+            <tr>
+                <th class="text-center info valign-middle">NO</th>
+                <th class="text-center info valign-middle">NAMA</th>
+                <th class="text-center info valign-middle">PANGKAT/KORP</th>
+                <th class="text-center info valign-middle">PANGKAT/NRP</th>
+                <th class="text-center info valign-middle">NILAI AKTIVITAS</th>
+                <th class="text-center info valign-middle">PRODUK</th>
+                <th class="text-center info valign-middle">NILAI AKHIR</th>
+            </tr>
+            <tr>
+                <th class="text-center" v-for="n in 7">{{n}}</th>
+            </tr>
+            </thead>
+            <tbody>
+            <template v-for="(pelaku, index) in paraPelaku">
+                <pelaku v-if="filterPelaku(pelaku)"
+                        :pelaku="pelaku"
+                        :nilai-kogas="nilaiNilaiKogas[pelaku.role.roleGroup]"
+                        :pelaku-terbaik="pelakuTerbaik"
+                        @nilai-akhir="storeNilaiAkhirCalculation"
+                ></pelaku>
+            </template>
+            </tbody>
+        </table>
+        <br>
+    </div>
+</template>
+
+<template class="nilai-perorangan-item-template">
+    <tr :class="{success: isTerbaik}">
+        <td></td>
+        <td>{{pelaku.user.name}}</td>
+        <td>{{pelaku.user.rank}}</td>
+        <td>{{pelaku.user.rank}} / {{pelaku.user.nrp}}</td>
+        <td class="text-center">{{ nilaiAktivitas | toFixed }}</td>
+        <td class="text-center">{{ nilaiProduk | toFixed }}</td>
+        <td class="text-center">{{ nilaiAkhir | toFixed }}</td>
+    </tr>
+</template>
